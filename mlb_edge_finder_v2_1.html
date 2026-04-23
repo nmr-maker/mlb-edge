@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MLB Edge Finder v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0c0f; --surface:#111318; --surface2:#181c23;
+  --border:#1e2430; --accent:#00ff88; --accent2:#0088ff;
+  --text:#e8eaf0; --muted:#5a6478;
+  --pos:#00ff88; --neg:#ff4455; --neu:#ffcc00;
+  --score1:#ff4455; --score2:#ff6b35; --score3:#ffcc00; --score4:#7fff00; --score5:#00ff88;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:14px;min-height:100vh;}
+a{color:var(--accent2);}
+
+.header{border-bottom:1px solid var(--border);padding:14px 22px;display:flex;align-items:center;gap:14px;background:var(--surface);}
+.header h1{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:3px;color:var(--accent);}
+.header .sub{color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;}
+.badge{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:4px 10px;border-radius:2px;border:1px solid var(--border);color:var(--muted);white-space:nowrap;}
+.badge.ok{border-color:var(--pos);color:var(--pos);}
+.badge.err{border-color:var(--neg);color:var(--neg);}
+.badges{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:calc(100vh - 57px);}
+.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:18px;display:flex;flex-direction:column;gap:18px;overflow-y:auto;}
+.content{padding:20px;overflow-y:auto;}
+
+.sec-title{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;}
+.input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;padding:9px 11px;border-radius:3px;outline:none;}
+.input:focus{border-color:var(--accent2);}
+.btn{display:block;width:100%;padding:10px 0;background:var(--accent);color:#000;border:none;cursor:pointer;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:2px;border-radius:3px;margin-top:8px;}
+.btn:hover{opacity:.85;} .btn:disabled{opacity:.35;cursor:not-allowed;}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.stat-box{background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:9px 10px;}
+.stat-val{font-family:'Bebas Neue',sans-serif;font-size:20px;color:var(--accent);}
+.stat-lbl{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
+
+.tab-bar{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:18px;}
+.tab{padding:7px 16px;cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border:none;border-bottom:2px solid transparent;background:transparent;margin-bottom:-1px;}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab:hover:not(.active){color:var(--text);}
+.tab-panel{display:none;} .tab-panel.active{display:block;}
+
+/* Game Cards */
+.game-card{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:14px;margin-bottom:10px;cursor:pointer;transition:border-color .2s;}
+.game-card:hover,.game-card.selected{border-color:var(--accent);}
+.card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;}
+.matchup-col .game-time{color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:10px;margin-bottom:6px;}
+.matchup-row{display:flex;align-items:center;gap:10px;}
+.team{font-family:'Bebas Neue',sans-serif;font-size:19px;letter-spacing:1px;}
+.vs{color:var(--muted);font-size:11px;font-family:'IBM Plex Mono',monospace;}
+
+/* BET SCORE */
+.bet-score-wrap{text-align:center;min-width:80px;}
+.bet-score-num{font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1;}
+.bet-score-label{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
+.bet-score-rec{font-family:'IBM Plex Mono',monospace;font-size:9px;margin-top:4px;padding:3px 6px;border-radius:2px;white-space:nowrap;}
+
+.odds-row{display:flex;gap:6px;margin-bottom:8px;}
+.odds-cell{background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:7px 9px;text-align:center;flex:1;}
+.odds-label{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:1px;text-transform:uppercase;}
+.odds-val{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;margin-top:2px;}
+.odds-prob{font-size:9px;color:var(--muted);margin-top:1px;}
+
+/* Signals */
+.sig-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;}
+.sig-tag{font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 7px;border-radius:2px;}
+.sig-tag.bull{background:rgba(0,255,136,.12);color:var(--pos);border:1px solid rgba(0,255,136,.2);}
+.sig-tag.bear{background:rgba(255,68,85,.12);color:var(--neg);border:1px solid rgba(255,68,85,.2);}
+.sig-tag.info{background:rgba(0,136,255,.12);color:var(--accent2);border:1px solid rgba(0,136,255,.2);}
+.sig-tag.neu{background:rgba(255,204,0,.12);color:var(--neu);border:1px solid rgba(255,204,0,.2);}
+
+/* Score bar */
+.score-bar-wrap{margin-top:8px;}
+.score-bar-label-row{display:flex;justify-content:space-between;margin-bottom:4px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);}
+.score-bar-track{height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+.score-bar-fill{height:100%;border-radius:3px;transition:width .5s;}
+
+/* Panel */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:18px;margin-top:14px;}
+.panel h3{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--accent);margin-bottom:14px;}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.factor-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);}
+.factor-row:last-child{border-bottom:none;}
+.factor-val{font-family:'IBM Plex Mono',monospace;font-size:12px;}
+.kelly-row{display:flex;gap:8px;margin-top:10px;}
+.kelly-box{background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:10px;text-align:center;flex:1;}
+.kelly-val{font-family:'Bebas Neue',sans-serif;font-size:18px;}
+.kelly-lbl{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:2px;}
+.prob-row{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:10px 12px;margin-top:10px;}
+.prob-row label{flex:1;font-size:12px;color:var(--muted);}
+.prob-input{background:var(--surface2);border:1px solid var(--border);color:var(--accent);font-family:'IBM Plex Mono',monospace;font-size:14px;padding:5px 9px;border-radius:3px;width:80px;text-align:center;outline:none;}
+
+/* Score breakdown */
+.score-breakdown{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;}
+.score-factor{background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:10px;}
+.score-factor-name{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+.score-factor-val{font-family:'Bebas Neue',sans-serif;font-size:16px;}
+.score-factor-note{font-size:11px;color:var(--muted);margin-top:2px;}
+
+/* Big rec box */
+.rec-box{padding:16px;border-radius:4px;margin-top:12px;display:flex;align-items:center;gap:16px;}
+.rec-score-big{font-family:'Bebas Neue',sans-serif;font-size:52px;line-height:1;}
+.rec-details{flex:1;}
+.rec-bet-type{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;}
+.rec-reason{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);margin-top:4px;line-height:1.6;}
+
+/* Alerts */
+.alert{padding:10px 14px;border-radius:3px;font-family:'IBM Plex Mono',monospace;font-size:12px;margin-top:8px;line-height:1.5;}
+.alert.ok{background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.3);color:var(--pos);}
+.alert.err{background:rgba(255,68,85,.1);border:1px solid rgba(255,68,85,.3);color:var(--neg);}
+.alert.info{background:rgba(0,136,255,.1);border:1px solid rgba(0,136,255,.3);color:var(--accent2);}
+.alert.neu{background:rgba(255,204,0,.1);border:1px solid rgba(255,204,0,.3);color:var(--neu);}
+
+/* EV Calc */
+.calc-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px;}
+.form-field label{display:block;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:5px;}
+.form-field input,.form-field select{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;padding:8px 10px;border-radius:3px;outline:none;}
+
+/* Tracker */
+.add-form{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;}
+.add-form2{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-top:8px;align-items:end;}
+.btn-sm{padding:8px 16px;background:var(--accent);color:#000;border:none;cursor:pointer;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1px;border-radius:3px;}
+.tracker-table{width:100%;border-collapse:collapse;margin-top:14px;}
+.tracker-table th{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);}
+.tracker-table td{padding:9px 10px;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-size:12px;}
+.tracker-table tr:hover td{background:var(--surface2);}
+.summary-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px;}
+
+/* Loading */
+.empty{text-align:center;padding:60px 20px;color:var(--muted);}
+.empty .icon{font-size:40px;margin-bottom:12px;}
+.empty p{font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.7;}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* Loading overlay on card */
+.card-loading{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);padding:6px 0;}
+
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.section-header h2{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;}
+.refresh-btn{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;padding:5px 12px;background:transparent;border:1px solid var(--border);color:var(--muted);cursor:pointer;border-radius:2px;}
+.refresh-btn:hover{border-color:var(--accent2);color:var(--accent2);}
+.refresh-btn:disabled{opacity:.3;cursor:not-allowed;}
+.quick-btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+.quick-btn{padding:7px 14px;border:none;cursor:pointer;font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:1px;border-radius:3px;}
+.rm-btn{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:13px;}
+.rm-btn:hover{color:var(--neg);}
+.vig-chip{font-family:'IBM Plex Mono',monospace;font-size:10px;padding:2px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:2px;color:var(--muted);display:inline-block;margin-bottom:6px;}
+.vig-chip span{color:var(--text);}
+.pitcher-row{display:flex;gap:8px;margin-bottom:8px;}
+.pitcher-card{background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:8px 10px;flex:1;font-family:'IBM Plex Mono',monospace;}
+.pitcher-name{font-size:11px;font-weight:600;color:var(--text);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pitcher-stat{font-size:10px;color:var(--muted);}
+.pitcher-fip{font-size:13px;font-weight:600;margin-top:2px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>⚾ MLB EDGE FINDER <span style="font-size:14px;color:var(--muted);letter-spacing:1px">v2</span></h1>
+    <div class="sub">LIVE ODDS · AUTO STATS · WEATHER · COMPOSITE BET SCORE</div>
+  </div>
+    <div class="badges">
+    <div class="badge" id="badge-odds">ODDS: NO KEY</div>
+    <div class="badge" id="badge-mlb">MLB API: —</div>
+    <div class="badge" id="badge-weather">WEATHER: —</div>
+    <div class="badge" id="badge-stale">LAST LOAD: —</div>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div>
+      <div class="sec-title">Odds API Key</div>
+      <input class="input" type="password" id="api-key" placeholder="Paste your key here..." />
+      <button class="btn" id="load-btn" onclick="loadAll()">⚡ LOAD & ANALYZE SLATE</button>
+      <div id="api-status"></div>
+    </div>
+    <div>
+      <div class="sec-title">Filters</div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:1px;margin-bottom:4px">MIN BET SCORE (1–5)</div>
+        <input class="input" type="number" id="score-threshold" value="3" min="1" max="5" step="1" onchange="renderGames()" />
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:1px;margin-bottom:4px">BANKROLL ($)</div>
+        <input class="input" type="number" id="bankroll" value="1000" step="100" />
+      </div>
+    </div>
+    <div>
+      <div class="sec-title">Score Legend</div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+          <div style="width:10px;height:10px;border-radius:2px;background:var(--score5)"></div><span style="color:var(--muted)">5 — Strong value, bet it</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+          <div style="width:10px;height:10px;border-radius:2px;background:var(--score4)"></div><span style="color:var(--muted)">4 — Good value, worth betting</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+          <div style="width:10px;height:10px;border-radius:2px;background:var(--score3)"></div><span style="color:var(--muted)">3 — Marginal, small stake</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+          <div style="width:10px;height:10px;border-radius:2px;background:var(--score2)"></div><span style="color:var(--muted)">2 — Weak signal, skip</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+          <div style="width:10px;height:10px;border-radius:2px;background:var(--score1)"></div><span style="color:var(--muted)">1 — No edge, pass</span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="sec-title">Session Stats</div>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="stat-val" id="s-games">—</div><div class="stat-lbl">Games</div></div>
+        <div class="stat-box"><div class="stat-val" id="s-strong">—</div><div class="stat-lbl">Score 4–5</div></div>
+        <div class="stat-box"><div class="stat-val" id="s-bets">0</div><div class="stat-lbl">Bets Logged</div></div>
+        <div class="stat-box"><div class="stat-val" id="s-roi" style="color:var(--neu)">—</div><div class="stat-lbl">ROI</div></div>
+      </div>
+    </div>
+    <div style="margin-top:auto;padding-top:12px;border-top:1px solid var(--border)">
+      <div style="font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;line-height:1.7">
+        Data sources: The Odds API · MLB Stats API · Baseball Savant · Open-Meteo<br><br>
+        💡 Scores are a starting point. Always verify pitcher news before betting.
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="tab-bar">
+      <button class="tab active" onclick="switchTab('slate',this)">TODAY'S SLATE</button>
+      <button class="tab" onclick="switchTab('paper',this)">📋 PAPER TRADING</button>
+      <button class="tab" onclick="switchTab('calibration',this)">📊 CALIBRATION</button>
+      <button class="tab" onclick="switchTab('ev',this)">EV CALCULATOR</button>
+      <button class="tab" onclick="switchTab('tracker',this)">BET TRACKER</button>
+    </div>
+
+    <!-- PAPER TRADING -->
+    <div class="tab-panel" id="tab-paper">
+      <div class="section-header">
+        <h2>📋 PAPER TRADING</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="refresh-btn" onclick="settleYesterday()" id="settle-btn">⚡ SETTLE YESTERDAY'S BETS</button>
+          <button class="refresh-btn" onclick="clearPaperBets()" style="color:var(--neg);border-color:var(--neg)">CLEAR ALL</button>
+        </div>
+      </div>
+
+      <!-- Unit config -->
+      <div class="panel" style="margin-top:0;margin-bottom:16px">
+        <h3>UNIT CONFIGURATION</h3>
+        <p style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.6">Configure your paper trading unit sizes. Run for 5+ days before drawing conclusions. The calibration tab will show you if your thresholds make sense.</p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px">
+          <div class="form-field">
+            <label>Tier 1 Min Score</label>
+            <input type="number" id="tier1-score" value="3.5" step="0.1" min="1" max="5" class="input" style="padding:8px 10px;font-size:12px" onchange="savePaperConfig()"/>
+          </div>
+          <div class="form-field">
+            <label>Tier 1 Unit ($)</label>
+            <input type="number" id="tier1-unit" value="1" step="0.5" min="0.5" class="input" style="padding:8px 10px;font-size:12px" onchange="savePaperConfig()"/>
+          </div>
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:10px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted)">
+            e.g. Score ≥ 3.5 → $1
+          </div>
+          <div class="form-field">
+            <label>Tier 2 Min Score</label>
+            <input type="number" id="tier2-score" value="4.5" step="0.1" min="1" max="5" class="input" style="padding:8px 10px;font-size:12px" onchange="savePaperConfig()"/>
+          </div>
+          <div class="form-field">
+            <label>Tier 2 Unit ($)</label>
+            <input type="number" id="tier2-unit" value="2" step="0.5" min="0.5" class="input" style="padding:8px 10px;font-size:12px" onchange="savePaperConfig()"/>
+          </div>
+          <div style="background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:10px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted)">
+            e.g. Score ≥ 4.5 → $2
+          </div>
+        </div>
+        <div class="alert info" id="config-note">Load today's slate first, then paper bets will appear automatically for any game above your thresholds.</div>
+      </div>
+
+      <!-- Auto-suggested paper bets for today -->
+      <div id="paper-suggestions"></div>
+
+      <!-- Paper bet log -->
+      <div style="margin-top:16px">
+        <div class="sec-title" style="margin-bottom:10px">PAPER BET LOG</div>
+        <div id="paper-summary"></div>
+        <table class="tracker-table">
+          <thead><tr>
+            <th>Date</th><th>Matchup</th><th>Bet</th><th>Odds</th><th>Score</th><th>Unit</th><th>Result</th><th>P&L</th><th>Settled</th>
+          </tr></thead>
+          <tbody id="paper-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CALIBRATION -->
+    <div class="tab-panel" id="tab-calibration">
+      <div class="section-header">
+        <h2>📊 CALIBRATION</h2>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted)" id="calib-data-note">Needs 10+ settled paper bets to be meaningful.</div>
+      </div>
+
+      <!-- Summary stats -->
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px" id="calib-summary"></div>
+
+      <!-- Score distribution chart -->
+      <div class="panel" style="margin-top:0;margin-bottom:16px">
+        <h3>WIN RATE BY SCORE RANGE</h3>
+        <p style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.6">This is the key chart. If the model has real edge, higher scores should correlate with higher win rates. If the bars are all flat, the scores aren't predictive.</p>
+        <div id="calib-chart" style="margin-top:8px"></div>
+      </div>
+
+      <!-- Bet type accuracy -->
+      <div class="panel">
+        <h3>ACCURACY BY BET TYPE</h3>
+        <div id="bettype-chart"></div>
+      </div>
+
+      <!-- Raw recommendation log -->
+      <div class="panel" style="margin-top:16px">
+        <h3>DAILY RECOMMENDATION LOG</h3>
+        <p style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:12px">Every bet the model recommended, settled or not.</p>
+        <div id="raw-log"></div>
+      </div>
+    </div>
+
+    <!-- SLATE -->
+    <div class="tab-panel active" id="tab-slate">
+      <div class="section-header">
+        <h2>TODAY'S GAMES</h2>
+        <button class="refresh-btn" id="refresh-btn" onclick="loadAll()" disabled>↻ REFRESH</button>
+      </div>
+      <div id="games-list">
+        <div class="empty"><div class="icon">🔑</div><p>Enter your Odds API key and click<br>⚡ LOAD & ANALYZE SLATE to begin.<br><br>The dashboard will automatically pull<br>pitcher stats, bullpen data, and weather.</p></div>
+      </div>
+      <div id="game-detail"></div>
+    </div>
+
+    <!-- EV CALCULATOR -->
+    <div class="tab-panel" id="tab-ev">
+      <h2 style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;margin-bottom:16px">EV CALCULATOR</h2>
+      <div class="panel">
+        <h3>MANUAL EV & KELLY SIZING</h3>
+        <div class="calc-grid">
+          <div class="form-field"><label>American Odds</label><input type="number" id="c-odds" value="-150" oninput="calcEVManual()"/></div>
+          <div class="form-field"><label>Your Win % Estimate</label><input type="number" id="c-prob" value="55" min="1" max="99" step="0.5" oninput="calcEVManual()"/></div>
+          <div class="form-field"><label>Bankroll ($)</label><input type="number" id="c-br" value="1000" oninput="calcEVManual()"/></div>
+        </div>
+        <div class="kelly-row">
+          <div class="kelly-box"><div class="kelly-val" id="c-imp" style="color:var(--accent2)">—</div><div class="kelly-lbl">Implied Prob</div></div>
+          <div class="kelly-box"><div class="kelly-val" id="c-ev">—</div><div class="kelly-lbl">EV per $100</div></div>
+          <div class="kelly-box"><div class="kelly-val" id="c-kelly">—</div><div class="kelly-lbl">Full Kelly %</div></div>
+          <div class="kelly-box"><div class="kelly-val" id="c-half">—</div><div class="kelly-lbl">½ Kelly Bet $</div></div>
+        </div>
+        <div id="c-verdict"></div>
+      </div>
+      <div class="panel">
+        <h3>VIG STRIPPER</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div class="form-field"><label>Side A Odds</label><input type="number" id="v-a" value="-110" oninput="calcVig()"/></div>
+          <div class="form-field"><label>Side B Odds</label><input type="number" id="v-b" value="-110" oninput="calcVig()"/></div>
+        </div>
+        <div class="kelly-row">
+          <div class="kelly-box"><div class="kelly-val" id="v-rawa" style="color:var(--accent2)">—</div><div class="kelly-lbl">Side A Raw%</div></div>
+          <div class="kelly-box"><div class="kelly-val" id="v-rawb" style="color:var(--accent2)">—</div><div class="kelly-lbl">Side B Raw%</div></div>
+          <div class="kelly-box"><div class="kelly-val" id="v-truea" style="color:var(--pos)">—</div><div class="kelly-lbl">Side A True%</div></div>
+          <div class="kelly-box"><div class="kelly-val" id="v-trueb" style="color:var(--pos)">—</div><div class="kelly-lbl">Side B True%</div></div>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px">
+          <span class="vig-chip">VIG: <span id="v-vig">—</span></span>
+          <span class="vig-chip">BOOK MARGIN: <span id="v-margin">—</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRACKER -->
+    <div class="tab-panel" id="tab-tracker">
+      <h2 style="font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;margin-bottom:16px">BET TRACKER</h2>
+      <div class="panel">
+        <h3>LOG A BET</h3>
+        <div class="add-form">
+          <div class="form-field"><label>Matchup</label><input type="text" id="t-matchup" placeholder="NYY @ BOS"/></div>
+          <div class="form-field"><label>Pick</label><input type="text" id="t-pick" placeholder="Yankees ML"/></div>
+          <div class="form-field"><label>Odds</label><input type="number" id="t-odds" placeholder="-130"/></div>
+          <div class="form-field"><label>Stake ($)</label><input type="number" id="t-stake" placeholder="50"/></div>
+        </div>
+        <div class="add-form2">
+          <div class="form-field"><label>Your Win % Est.</label><input type="number" id="t-prob" placeholder="55"/></div>
+          <div class="form-field"><label>Result</label>
+            <select id="t-result"><option value="P">Pending</option><option value="W">Win</option><option value="L">Loss</option></select>
+          </div>
+          <button class="btn-sm" onclick="addBet()">+ ADD BET</button>
+        </div>
+      </div>
+      <div id="tracker-summary"></div>
+      <table class="tracker-table">
+        <thead><tr>
+          <th>Date</th><th>Matchup</th><th>Pick</th><th>Odds</th><th>Stake</th><th>Est. EV</th><th>P&L</th><th>Result</th><th></th>
+        </tr></thead>
+        <tbody id="bet-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Math ─────────────────────────────────────────────────────────────────────
+const toDecimal = o => o > 0 ? o/100+1 : 100/Math.abs(o)+1;
+const impProb   = o => o > 0 ? 100/(o+100) : Math.abs(o)/(Math.abs(o)+100);
+const calcEV    = (pct,o) => { const d=toDecimal(o),p=pct/100; return((p*(d-1))-(1-p))*100; };
+const kellyF    = (pct,o) => { const b=toDecimal(o)-1,p=pct/100; return Math.max(0,(b*p-(1-p))/b); };
+const fmtOdds   = o => o>0?'+'+o:''+o;
+const fmtPct    = p => (p*100).toFixed(1)+'%';
+const evCol     = ev => ev>=5?'var(--pos)':ev>=2?'var(--neu)':'var(--neg)';
+const scoreColor= s => ['','var(--score1)','var(--score2)','var(--score3)','var(--score4)','var(--score5)'][Math.round(s)]||'var(--muted)';
+
+// ─── MLB Stadium Locations (for weather) ──────────────────────────────────────
+const STADIUMS = {
+  'Arizona Diamondbacks':    {lat:33.4453,lon:-112.0667,name:'Chase Field'},
+  'Atlanta Braves':          {lat:33.8908,lon:-84.4678,name:'Truist Park'},
+  'Baltimore Orioles':       {lat:39.2838,lon:-76.6218,name:'Oriole Park'},
+  'Boston Red Sox':          {lat:42.3467,lon:-71.0972,name:'Fenway Park'},
+  'Chicago Cubs':            {lat:41.9484,lon:-87.6553,name:'Wrigley Field'},
+  'Chicago White Sox':       {lat:41.8299,lon:-87.6338,name:'Guaranteed Rate Field'},
+  'Cincinnati Reds':         {lat:39.0979,lon:-84.5082,name:'Great American Ball Park'},
+  'Cleveland Guardians':     {lat:41.4962,lon:-81.6852,name:'Progressive Field'},
+  'Colorado Rockies':        {lat:39.7559,lon:-104.9942,name:'Coors Field'},
+  'Detroit Tigers':          {lat:42.3390,lon:-83.0485,name:'Comerica Park'},
+  'Houston Astros':          {lat:29.7573,lon:-95.3555,name:'Minute Maid Park'},
+  'Kansas City Royals':      {lat:39.0517,lon:-94.4803,name:'Kauffman Stadium'},
+  'Los Angeles Angels':      {lat:33.8003,lon:-117.8827,name:'Angel Stadium'},
+  'Los Angeles Dodgers':     {lat:34.0739,lon:-118.2400,name:'Dodger Stadium'},
+  'Miami Marlins':           {lat:25.7781,lon:-80.2197,name:'loanDepot park'},
+  'Milwaukee Brewers':       {lat:43.0280,lon:-87.9712,name:'American Family Field'},
+  'Minnesota Twins':         {lat:44.9817,lon:-93.2776,name:'Target Field'},
+  'New York Mets':           {lat:40.7571,lon:-73.8458,name:'Citi Field'},
+  'New York Yankees':        {lat:40.8296,lon:-73.9262,name:'Yankee Stadium'},
+  'Oakland Athletics':       {lat:37.7516,lon:-122.2005,name:'Oakland Coliseum'},
+  'Philadelphia Phillies':   {lat:39.9061,lon:-75.1665,name:'Citizens Bank Park'},
+  'Pittsburgh Pirates':      {lat:40.4469,lon:-80.0057,name:'PNC Park'},
+  'San Diego Padres':        {lat:32.7076,lon:-117.1570,name:'Petco Park'},
+  'San Francisco Giants':    {lat:37.7786,lon:-122.3893,name:'Oracle Park'},
+  'Seattle Mariners':        {lat:47.5914,lon:-122.3325,name:'T-Mobile Park'},
+  'St. Louis Cardinals':     {lat:38.6226,lon:-90.1928,name:'Busch Stadium'},
+  'Tampa Bay Rays':          {lat:27.7683,lon:-82.6534,name:'Tropicana Field'},
+  'Texas Rangers':           {lat:32.7513,lon:-97.0832,name:'Globe Life Field'},
+  'Toronto Blue Jays':       {lat:43.6414,lon:-79.3894,name:'Rogers Centre'},
+  'Washington Nationals':    {lat:38.8730,lon:-77.0074,name:'Nationals Park'},
+};
+
+const INDOOR = ['Tampa Bay Rays','Toronto Blue Jays','Arizona Diamondbacks','Milwaukee Brewers','Houston Astros','Seattle Mariners'];
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let games = [];
+let enriched = {}; // gameId -> {homeStarter, awayStarter, bullpen, weather, lineMove}
+let selectedIdx = null;
+let bets = JSON.parse(localStorage.getItem('mlbedge_v2_bets')||'[]');
+
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+function switchTab(id,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-'+id).classList.add('active');
+  if(id==='ev'){calcEVManual();calcVig();}
+  if(id==='tracker') renderTracker();
+  if(id==='paper') renderPaperTab();
+  if(id==='calibration') renderCalibration();
+}
+
+// ─── Staleness tracker ────────────────────────────────────────────────────────
+let lastLoadTime = null;
+function updateStaleBadge(){
+  const el = document.getElementById('badge-stale');
+  if(!lastLoadTime){ el.textContent='LAST LOAD: —'; el.className='badge'; return; }
+  const mins = Math.floor((Date.now()-lastLoadTime)/60000);
+  if(mins<2){ el.textContent='LOADED: JUST NOW'; el.className='badge ok'; }
+  else if(mins<60){ el.textContent=`LOADED: ${mins}m AGO`; el.className='badge ok'; }
+  else { el.textContent=`LOADED: ${Math.floor(mins/60)}h AGO`; el.className='badge err'; }
+}
+setInterval(updateStaleBadge, 30000);
+
+// ─── Paper Trading State ──────────────────────────────────────────────────────
+let paperBets = JSON.parse(localStorage.getItem('mlbedge_paper_bets')||'[]');
+let paperConfig = JSON.parse(localStorage.getItem('mlbedge_paper_config')||'{"tier1Score":3.5,"tier1Unit":1,"tier2Score":4.5,"tier2Unit":2}');
+
+function savePaperConfig(){
+  paperConfig = {
+    tier1Score: parseFloat(document.getElementById('tier1-score').value)||3.5,
+    tier1Unit:  parseFloat(document.getElementById('tier1-unit').value)||1,
+    tier2Score: parseFloat(document.getElementById('tier2-score').value)||4.5,
+    tier2Unit:  parseFloat(document.getElementById('tier2-unit').value)||2,
+  };
+  localStorage.setItem('mlbedge_paper_config', JSON.stringify(paperConfig));
+  renderPaperTab();
+}
+
+function savePaperBets(){ localStorage.setItem('mlbedge_paper_bets', JSON.stringify(paperBets)); }
+
+function unitForScore(score){
+  if(score >= paperConfig.tier2Score) return paperConfig.tier2Unit;
+  if(score >= paperConfig.tier1Score) return paperConfig.tier1Unit;
+  return 0;
+}
+
+// Auto-place paper bets for current slate
+function autoPlacePaperBets(){
+  if(!games.length) return;
+  const today = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+
+  games.forEach(g=>{
+    const best = bestBetForGame(g);
+    if(!best) return;
+    const unit = unitForScore(best.result.score);
+    if(unit===0) return;
+
+    // Don't duplicate — check if already placed for this game+date
+    const alreadyExists = paperBets.some(b=>b.gameId===g.id && b.date===today);
+    if(alreadyExists) return;
+
+    const dk = g.bookmakers.find(b=>b.key==='draftkings');
+    const h2h = dk?.markets.find(m=>m.key==='h2h');
+    const tots = dk?.markets.find(m=>m.key==='totals');
+    const home = g.home_team, away = g.away_team;
+
+    let odds = null;
+    if(best.side==='home') odds = h2h?.outcomes.find(o=>o.name===home)?.price;
+    else if(best.side==='away') odds = h2h?.outcomes.find(o=>o.name!==home)?.price;
+    else if(best.side==='over') odds = tots?.outcomes.find(o=>o.name==='Over')?.price;
+    else if(best.side==='under') odds = tots?.outcomes.find(o=>o.name==='Under')?.price;
+
+    const total = tots?.outcomes.find(o=>o.name==='Over')?.point;
+
+    paperBets.unshift({
+      id: Date.now() + Math.random(),
+      gameId: g.id,
+      date: today,
+      gameDate: new Date().toISOString().slice(0,10),
+      matchup: `${away.split(' ').pop()} @ ${home.split(' ').pop()}`,
+      homeTeam: home,
+      awayTeam: away,
+      betType: best.side,
+      betLabel: best.label,
+      odds: odds||null,
+      score: best.result.score,
+      unit,
+      result: 'P', // Pending
+      pnl: 0,
+      settled: false,
+      mlbGamePk: enriched[g.id]?.mlbGameId||null,
+      total: total||null,
+    });
+  });
+
+  savePaperBets();
+  renderPaperTab();
+}
+
+// Settle yesterday's bets by fetching final scores
+async function settleYesterday(){
+  const btn = document.getElementById('settle-btn');
+  btn.textContent = 'SETTLING...';
+  btn.disabled = true;
+
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate()-1);
+  const yDate = yesterday.toISOString().slice(0,10);
+
+  const pending = paperBets.filter(b=>b.gameDate===yDate && !b.settled);
+  if(!pending.length){
+    showPaperStatus('No pending bets from yesterday to settle.','info');
+    btn.textContent='⚡ SETTLE YESTERDAY\'S BETS'; btn.disabled=false;
+    return;
+  }
+
+  try {
+    const res = await fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${yDate}&hydrate=linescore`);
+    const data = await res.json();
+    const mlbGames = (data.dates?.[0]?.games||[]);
+
+    let settled=0;
+    for(const pb of pending){
+      // Find matching game
+      const mlbGame = mlbGames.find(mg=>{
+        const mHome=mg.teams?.home?.team?.name||'';
+        const mAway=mg.teams?.away?.team?.name||'';
+        return fuzzyMatch(pb.homeTeam,mHome)&&fuzzyMatch(pb.awayTeam,mAway);
+      });
+
+      if(!mlbGame) continue;
+      if(mlbGame.status?.abstractGameState!=='Final') continue;
+
+      const homeScore = mlbGame.teams?.home?.score??null;
+      const awayScore = mlbGame.teams?.away?.score??null;
+      if(homeScore===null||awayScore===null) continue;
+
+      const totalRuns = homeScore+awayScore;
+      let won = false;
+
+      if(pb.betType==='home') won = homeScore>awayScore;
+      else if(pb.betType==='away') won = awayScore>homeScore;
+      else if(pb.betType==='over') won = pb.total!==null && totalRuns>pb.total;
+      else if(pb.betType==='under') won = pb.total!==null && totalRuns<pb.total;
+
+      // Calculate P&L
+      const dec = pb.odds ? toDecimal(pb.odds) : 1.909; // default -110
+      pb.result = won ? 'W' : 'L';
+      pb.pnl = won ? pb.unit*(dec-1) : -pb.unit;
+      pb.settled = true;
+      pb.finalScore = `${awayScore}-${homeScore}`;
+      settled++;
+    }
+
+    savePaperBets();
+    renderPaperTab();
+    renderCalibration();
+    showPaperStatus(`Settled ${settled} of ${pending.length} bets from ${yDate}.`, settled>0?'ok':'info');
+  } catch(e){
+    showPaperStatus('Error fetching scores: '+e.message,'err');
+  }
+
+  btn.textContent='⚡ SETTLE YESTERDAY\'S BETS'; btn.disabled=false;
+}
+
+function showPaperStatus(msg, type){
+  const el = document.getElementById('config-note');
+  el.className = 'alert '+(type==='ok'?'ok':type==='err'?'err':'info');
+  el.textContent = msg;
+}
+
+function clearPaperBets(){
+  if(!confirm('Clear all paper bets? This cannot be undone.')) return;
+  paperBets=[];
+  savePaperBets();
+  renderPaperTab();
+  renderCalibration();
+}
+
+function manualSettle(id, result){
+  const bet = paperBets.find(b=>b.id===id);
+  if(!bet) return;
+  bet.result = result;
+  const dec = bet.odds ? toDecimal(bet.odds) : 1.909;
+  bet.pnl = result==='W' ? bet.unit*(dec-1) : result==='L' ? -bet.unit : 0;
+  bet.settled = result!=='P';
+  savePaperBets();
+  renderPaperTab();
+  renderCalibration();
+}
+
+function renderPaperTab(){
+  // Sync config inputs
+  document.getElementById('tier1-score').value = paperConfig.tier1Score;
+  document.getElementById('tier1-unit').value  = paperConfig.tier1Unit;
+  document.getElementById('tier2-score').value = paperConfig.tier2Score;
+  document.getElementById('tier2-unit').value  = paperConfig.tier2Unit;
+
+  // Auto-suggestions from current slate
+  const sugEl = document.getElementById('paper-suggestions');
+  if(games.length){
+    const today = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    const todayBets = paperBets.filter(b=>b.date===today);
+    const suggestions = games.map(g=>{
+      const best=bestBetForGame(g); if(!best) return null;
+      const unit=unitForScore(best.result.score); if(unit===0) return null;
+      return {game:g, best, unit};
+    }).filter(Boolean);
+
+    if(suggestions.length){
+      const sc=scoreColor;
+      sugEl.innerHTML=`<div class="panel" style="margin-bottom:16px">
+        <h3>TODAY'S AUTO-RECOMMENDATIONS</h3>
+        <p style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6">
+          These bets meet your tier thresholds. They are automatically logged as paper bets when you load the slate.
+          ${todayBets.length?`<br><span style="color:var(--pos)">✅ ${todayBets.length} paper bet(s) already placed for today.</span>`:''}
+        </p>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${suggestions.map(({game:g,best,unit})=>{
+            const already = todayBets.some(b=>b.gameId===g.id);
+            const sc2=scoreColor(Math.round(best.result.score));
+            return `<div style="background:var(--bg);border:1px solid ${already?'var(--pos)':'var(--border)'};border-radius:3px;padding:12px;display:flex;align-items:center;gap:12px">
+              <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:${sc2};min-width:36px;text-align:center">${best.result.score.toFixed(1)}</div>
+              <div style="flex:1">
+                <div style="font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1px">${g.away_team.split(' ').pop().toUpperCase()} @ ${g.home_team.split(' ').pop().toUpperCase()}</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);margin-top:2px">Rec: ${best.label} · Odds: ${best.result.targetOdds?fmtOdds(best.result.targetOdds):'—'}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-family:'Bebas Neue',sans-serif;font-size:18px;color:${unit>=paperConfig.tier2Unit?'var(--pos)':'var(--neu)'}">$${unit} UNIT</div>
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted)">${unit>=paperConfig.tier2Unit?'TIER 2':'TIER 1'}</div>
+              </div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:${already?'var(--pos)':'var(--muted)'}">${already?'✅ LOGGED':'AUTO-LOGGED ON LOAD'}</div>
+            </div>`;
+          }).join('')}
+        </div>
+        ${!todayBets.length?`<button onclick="autoPlacePaperBets()" class="btn" style="margin-top:12px">📋 LOG TODAY'S PAPER BETS NOW</button>`:''}
+      </div>`;
+    } else {
+      sugEl.innerHTML=`<div class="alert info" style="margin-bottom:16px">No games meet your tier thresholds today. Consider lowering Tier 1 score to see more recommendations.</div>`;
+    }
+  } else {
+    sugEl.innerHTML=`<div class="alert info" style="margin-bottom:16px">Load today's slate first to see recommendations.</div>`;
+  }
+
+  // Summary stats
+  const sumEl = document.getElementById('paper-summary');
+  const settled = paperBets.filter(b=>b.settled);
+  const wins = settled.filter(b=>b.result==='W').length;
+  const totalUnits = settled.reduce((s,b)=>s+b.unit,0);
+  const totalPnl = settled.reduce((s,b)=>s+b.pnl,0);
+  const roi = totalUnits>0?(totalPnl/totalUnits*100):0;
+  const winRate = settled.length>0?(wins/settled.length*100):0;
+
+  if(paperBets.length){
+    sumEl.className='summary-grid';
+    sumEl.innerHTML=[
+      ['Total Bets',paperBets.length,'var(--text)'],
+      ['Settled',settled.length,'var(--text)'],
+      ['Win Rate',settled.length?winRate.toFixed(1)+'%':'—',winRate>=52?'var(--pos)':'var(--neg)'],
+      ['Units P&L',(totalPnl>=0?'+':'')+totalPnl.toFixed(2),totalPnl>=0?'var(--pos)':'var(--neg)'],
+      ['ROI',(roi>=0?'+':'')+roi.toFixed(1)+'%',roi>=0?'var(--pos)':'var(--neg)'],
+    ].map(([l,v,c])=>`<div class="stat-box"><div class="stat-val" style="font-size:16px;color:${c}">${v}</div><div class="stat-lbl">${l}</div></div>`).join('');
+  } else { sumEl.className=''; sumEl.innerHTML=''; }
+
+  // Table
+  const tbody = document.getElementById('paper-tbody');
+  if(!paperBets.length){
+    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:40px;font-family:\'IBM Plex Mono\',monospace;font-size:11px">No paper bets yet. Load the slate to auto-generate bets.</td></tr>';
+    return;
+  }
+  const sc2=scoreColor;
+  tbody.innerHTML=paperBets.map(b=>{
+    const sc3=sc2(Math.round(b.score));
+    const pc=!b.settled?'var(--muted)':b.pnl>=0?'var(--pos)':'var(--neg)';
+    return `<tr>
+      <td style="color:var(--muted)">${b.date}</td>
+      <td>${b.matchup}</td>
+      <td style="font-weight:600;color:var(--accent2)">${b.betLabel}</td>
+      <td style="color:${b.odds&&b.odds>0?'var(--pos)':'var(--text)'}">${b.odds?fmtOdds(b.odds):'—'}</td>
+      <td style="color:${sc3};font-family:'Bebas Neue',sans-serif;font-size:16px">${b.score.toFixed(1)}</td>
+      <td>$${b.unit}</td>
+      <td>
+        <select onchange="manualSettle(${b.id},this.value)" style="background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:10px;padding:3px 6px;border-radius:2px">
+          <option value="P"${b.result==='P'?' selected':''}>PENDING</option>
+          <option value="W"${b.result==='W'?' selected':''}>WIN</option>
+          <option value="L"${b.result==='L'?' selected':''}>LOSS</option>
+        </select>
+        ${b.finalScore?`<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);margin-left:6px">${b.finalScore}</span>`:''}
+      </td>
+      <td style="color:${pc};font-family:'IBM Plex Mono',monospace">${b.settled?(b.pnl>=0?'+':'')+b.pnl.toFixed(2)+'u':'—'}</td>
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:${b.settled?'var(--pos)':'var(--muted)'}">${b.settled?'✅ AUTO':b.result==='P'?'PENDING':'MANUAL'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── Calibration ──────────────────────────────────────────────────────────────
+function renderCalibration(){
+  const settled = paperBets.filter(b=>b.settled && (b.result==='W'||b.result==='L'));
+
+  const noteEl = document.getElementById('calib-data-note');
+  noteEl.textContent = settled.length>=10 ? `${settled.length} settled bets — sufficient data.` : `${settled.length}/10 settled bets needed for meaningful calibration.`;
+  noteEl.style.color = settled.length>=10?'var(--pos)':'var(--neu)';
+
+  // Summary
+  const wins=settled.filter(b=>b.result==='W').length;
+  const totalPnl=settled.reduce((s,b)=>s+b.pnl,0);
+  const totalUnits=settled.reduce((s,b)=>s+b.unit,0);
+  const roi=totalUnits>0?(totalPnl/totalUnits*100):0;
+  const winRate=settled.length?wins/settled.length*100:0;
+
+  const sumEl = document.getElementById('calib-summary');
+  sumEl.innerHTML=[
+    ['Settled Bets',settled.length,'var(--text)'],
+    ['Win Rate',settled.length?winRate.toFixed(1)+'%':'—',winRate>=53?'var(--pos)':winRate>=50?'var(--neu)':'var(--neg)'],
+    ['Units Won',(totalPnl>=0?'+':'')+totalPnl.toFixed(2)+'u',totalPnl>=0?'var(--pos)':'var(--neg)'],
+    ['ROI',(roi>=0?'+':'')+roi.toFixed(1)+'%',roi>=0?'var(--pos)':'var(--neg)'],
+    ['Avg Score',settled.length?(settled.reduce((s,b)=>s+b.score,0)/settled.length).toFixed(2):'—','var(--accent2)'],
+  ].map(([l,v,c])=>`<div class="stat-box"><div class="stat-val" style="font-size:16px;color:${c}">${v}</div><div class="stat-lbl">${l}</div></div>`).join('');
+
+  // Score buckets: 1-2, 2-3, 3-3.5, 3.5-4, 4-4.5, 4.5-5
+  const buckets=[
+    {label:'1.0–2.9',min:1,max:3},
+    {label:'3.0–3.4',min:3,max:3.5},
+    {label:'3.5–3.9',min:3.5,max:4},
+    {label:'4.0–4.4',min:4,max:4.5},
+    {label:'4.5–5.0',min:4.5,max:5.01},
+  ];
+
+  const chartEl = document.getElementById('calib-chart');
+  if(!settled.length){
+    chartEl.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted);font-family:\'IBM Plex Mono\',monospace;font-size:11px">No settled bets yet. Results will appear here as bets settle.</div>';
+  } else {
+    chartEl.innerHTML=`<div style="display:flex;flex-direction:column;gap:10px">
+      ${buckets.map(bucket=>{
+        const inBucket=settled.filter(b=>b.score>=bucket.min&&b.score<bucket.max);
+        const bWins=inBucket.filter(b=>b.result==='W').length;
+        const bRate=inBucket.length?bWins/inBucket.length:null;
+        const pct=bRate!==null?Math.round(bRate*100):null;
+        const barW=pct||0;
+        const barCol=bRate===null?'var(--border)':bRate>=0.55?'var(--pos)':bRate>=0.50?'var(--neu)':'var(--neg)';
+        return `<div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-family:'IBM Plex Mono',monospace;font-size:11px">
+            <span style="color:var(--muted)">Score ${bucket.label}</span>
+            <span>${inBucket.length} bets · <span style="color:${barCol};font-weight:600">${pct!==null?pct+'% win rate':'no data'}</span></span>
+          </div>
+          <div style="height:24px;background:var(--border);border-radius:3px;overflow:hidden;position:relative">
+            <div style="height:100%;width:${barW}%;background:${barCol};border-radius:3px;transition:width .5s;display:flex;align-items:center;padding-left:8px">
+              ${barW>15?`<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#000;font-weight:600">${pct}%</span>`:''}
+            </div>
+            <div style="position:absolute;top:50%;transform:translateY(-50%);left:8px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);pointer-events:none">
+              ${barW<=15&&pct!==null?pct+'%':''}
+            </div>
+            <!-- 50% line -->
+            <div style="position:absolute;top:0;left:50%;height:100%;width:1px;background:rgba(255,255,255,0.15)"></div>
+          </div>
+          <div style="font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-top:2px;text-align:right">50% break-even line at center</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="margin-top:12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);line-height:1.7">
+      ${settled.length>=10?
+        winRate>=55?'✅ Win rate above 55% — model showing real edge. Consider going live on Tier 2 bets.':
+        winRate>=52?'⚠️ Win rate marginally positive. Keep tracking for another week before going live.':
+        winRate>=50?'⚠️ Win rate near break-even. Scores may not be predictive yet. Do not go live.':
+        '❌ Win rate below 50%. Model needs adjustment. Do not bet real money yet.'
+        :'Keep paper trading until you have 10+ settled bets.'}
+    </div>`;
+  }
+
+  // Bet type breakdown
+  const btEl = document.getElementById('bettype-chart');
+  const types=['home','away','over','under'];
+  const typeLabels={'home':'Home ML','away':'Away ML','over':'Over','under':'Under'};
+  btEl.innerHTML=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:4px">
+    ${types.map(t=>{
+      const group=settled.filter(b=>b.betType===t);
+      const gWins=group.filter(b=>b.result==='W').length;
+      const wr=group.length?gWins/group.length*100:null;
+      const col=wr===null?'var(--muted)':wr>=55?'var(--pos)':wr>=50?'var(--neu)':'var(--neg)';
+      return `<div class="kelly-box">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">${typeLabels[t]}</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;color:${col}">${wr!==null?wr.toFixed(0)+'%':'—'}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);margin-top:2px">${group.length} bets</div>
+      </div>`;
+    }).join('')}
+  </div>
+  <div style="margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);line-height:1.6">
+    After 10+ bets per type, this will tell you which bet type the model is best at predicting. If Over/Under is consistently above 55% but ML is flat, you'd only bet totals going live.
+  </div>`;
+
+  // Raw log
+  const logEl = document.getElementById('raw-log');
+  if(!paperBets.length){
+    logEl.innerHTML='<div style="color:var(--muted);font-family:\'IBM Plex Mono\',monospace;font-size:11px;padding:20px 0">No data yet.</div>';
+    return;
+  }
+  logEl.innerHTML=`<table class="tracker-table">
+    <thead><tr><th>Date</th><th>Game</th><th>Rec</th><th>Score</th><th>Odds</th><th>Result</th><th>Final</th><th>P&L</th></tr></thead>
+    <tbody>${paperBets.map(b=>{
+      const sc=scoreColor(Math.round(b.score));
+      const pc=!b.settled?'var(--muted)':b.pnl>=0?'var(--pos)':'var(--neg)';
+      return `<tr>
+        <td style="color:var(--muted)">${b.date}</td>
+        <td>${b.matchup}</td>
+        <td style="color:var(--accent2)">${b.betLabel}</td>
+        <td style="color:${sc};font-family:'Bebas Neue',sans-serif;font-size:16px">${b.score.toFixed(1)}</td>
+        <td>${b.odds?fmtOdds(b.odds):'—'}</td>
+        <td style="color:b.result==='W'?'var(--pos)':b.result==='L'?'var(--neg)':'var(--muted)'">${b.result}</td>
+        <td style="color:var(--muted)">${b.finalScore||'—'}</td>
+        <td style="color:${pc}">${b.settled?(b.pnl>=0?'+':'')+b.pnl.toFixed(2)+'u':'pending'}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+// ─── MAIN LOAD ────────────────────────────────────────────────────────────────
+async function loadAll(){
+  const key = document.getElementById('api-key').value.trim();
+  if(!key){showStatus('err','Please enter your Odds API key.');return;}
+  const btn = document.getElementById('load-btn');
+  btn.disabled=true; btn.textContent='LOADING...';
+  document.getElementById('game-detail').innerHTML='';
+  document.getElementById('games-list').innerHTML=`<div class="empty"><span class="spinner" style="width:24px;height:24px;border-width:3px"></span><p style="margin-top:14px">Step 1/4: Fetching live DraftKings odds...</p></div>`;
+
+  try {
+    // Step 1: Odds
+    const oddsRes = await fetch(`https://api.the-odds-api.com/v4/sports/baseball_mlb/odds/?apiKey=${key}&regions=us&markets=h2h,totals&oddsFormat=american&bookmakers=draftkings`);
+    if(!oddsRes.ok){
+      const err = await oddsRes.json().catch(()=>({}));
+      setBadge('badge-odds','err',`ODDS: ERROR ${oddsRes.status}`);
+      showStatus('err',`Odds API error: ${err.message||oddsRes.status}`);
+      document.getElementById('games-list').innerHTML='<div class="empty"><div class="icon">❌</div><p>Odds API error. Check your key.</p></div>';
+      btn.disabled=false; btn.textContent='⚡ LOAD & ANALYZE SLATE'; return;
+    }
+    games = await oddsRes.json();
+    const remaining = oddsRes.headers.get('x-requests-remaining');
+    setBadge('badge-odds','ok',`ODDS: LIVE · ${remaining||'?'} LEFT`);
+    document.getElementById('s-games').textContent = games.length;
+    document.getElementById('refresh-btn').disabled = false;
+
+    // Render immediately with odds only
+    renderGames();
+
+    // Step 2: MLB schedule + pitchers
+    document.getElementById('games-list').innerHTML=`<div class="empty"><span class="spinner" style="width:20px;height:20px;border-width:2px"></span><p style="margin-top:10px">Step 2/4: Fetching pitcher data from MLB Stats API...</p></div>`;
+    await fetchPitcherData();
+    setBadge('badge-mlb','ok','MLB API: OK');
+
+    // Step 3: Bullpen fatigue
+    document.getElementById('games-list').innerHTML=`<div class="empty"><span class="spinner" style="width:20px;height:20px;border-width:2px"></span><p style="margin-top:10px">Step 3/4: Calculating bullpen fatigue...</p></div>`;
+    await fetchBullpenData();
+
+    // Step 4: Weather
+    document.getElementById('games-list').innerHTML=`<div class="empty"><span class="spinner" style="width:20px;height:20px;border-width:2px"></span><p style="margin-top:10px">Step 4/4: Fetching weather for each stadium...</p></div>`;
+    await fetchWeatherData();
+    setBadge('badge-weather','ok','WEATHER: OK');
+
+    showStatus('ok',`Loaded ${games.length} games with full analysis.`);
+    renderGames();
+    autoPlacePaperBets();
+    lastLoadTime = Date.now();
+    updateStaleBadge();
+
+  } catch(e) {
+    console.error(e);
+    showStatus('err','Error: '+e.message);
+    renderGames();
+  }
+
+  btn.disabled=false; btn.textContent='⚡ LOAD & ANALYZE SLATE';
+}
+
+// ─── Pitcher Data ─────────────────────────────────────────────────────────────
+async function fetchPitcherData(){
+  const today = new Date().toISOString().slice(0,10);
+  try {
+    const res = await fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=${today}&hydrate=probablePitcher(note),team`);
+    const data = await res.json();
+    const mlbGames = data.dates?.[0]?.games || [];
+
+    for(const g of games){
+      const home = g.home_team, away = g.away_team;
+      // Match by team name (fuzzy)
+      const mlbGame = mlbGames.find(mg => {
+        const mHome = mg.teams?.home?.team?.name||'';
+        const mAway = mg.teams?.away?.team?.name||'';
+        return fuzzyMatch(home,mHome) && fuzzyMatch(away,mAway);
+      });
+
+      if(mlbGame){
+        const homeP = mlbGame.teams?.home?.probablePitcher;
+        const awayP = mlbGame.teams?.away?.probablePitcher;
+        if(!enriched[g.id]) enriched[g.id]={};
+        enriched[g.id].homeStarter = homeP ? {name:homeP.fullName, id:homeP.id} : null;
+        enriched[g.id].awayStarter = awayP ? {name:awayP.fullName, id:awayP.id} : null;
+        enriched[g.id].mlbGameId = mlbGame.gamePk;
+        enriched[g.id].homeTeamId = mlbGame.teams?.home?.team?.id;
+        enriched[g.id].awayTeamId = mlbGame.teams?.away?.team?.id;
+
+        // Fetch pitcher stats
+        if(homeP?.id) enriched[g.id].homePitcherStats = await fetchPitcherStats(homeP.id);
+        if(awayP?.id) enriched[g.id].awayPitcherStats = await fetchPitcherStats(awayP.id);
+      }
+    }
+  } catch(e){ console.warn('Pitcher fetch failed:',e); }
+}
+
+async function fetchPitcherStats(pitcherId){
+  try {
+    const season = new Date().getFullYear();
+    const res = await fetch(`https://statsapi.mlb.com/api/v1/people/${pitcherId}/stats?stats=season&group=pitching&season=${season}&sportId=1`);
+    const data = await res.json();
+    const stats = data.stats?.[0]?.splits?.[0]?.stat;
+    if(!stats) return null;
+    const era = parseFloat(stats.era)||null;
+    const fip = calcFIP(stats);
+    const whip = parseFloat(stats.whip)||null;
+    const ip = parseFloat(stats.inningsPitched)||0;
+    const k9 = ip>0 ? (parseFloat(stats.strikeOuts)||0)/ip*9 : null;
+    return {era, fip, whip, k9, ip, raw:stats};
+  } catch(e){ return null; }
+}
+
+function calcFIP(stats){
+  // FIP = ((13*HR) + (3*(BB+HBP)) - (2*K)) / IP + FIP_constant (~3.2)
+  try {
+    const hr = parseFloat(stats.homeRuns)||0;
+    const bb = parseFloat(stats.baseOnBalls)||0;
+    const hbp = parseFloat(stats.hitByPitch)||0;
+    const k = parseFloat(stats.strikeOuts)||0;
+    const ip = parseFloat(stats.inningsPitched)||1;
+    return ((13*hr + 3*(bb+hbp) - 2*k) / ip + 3.20);
+  } catch(e){ return null; }
+}
+
+// ─── Bullpen Data ─────────────────────────────────────────────────────────────
+async function fetchBullpenData(){
+  const today = new Date();
+  const lookback = 3;
+
+  for(const g of games){
+    const e = enriched[g.id] || {};
+    if(!enriched[g.id]) enriched[g.id]={};
+
+    try {
+      // Get last 3 days of games for each team to calculate bullpen usage
+      const [homeFatigue, awayFatigue] = await Promise.all([
+        e.homeTeamId ? getBullpenFatigue(e.homeTeamId, today, lookback) : Promise.resolve(null),
+        e.awayTeamId ? getBullpenFatigue(e.awayTeamId, today, lookback) : Promise.resolve(null)
+      ]);
+      enriched[g.id].homeBullpen = homeFatigue;
+      enriched[g.id].awayBullpen = awayFatigue;
+    } catch(err){ console.warn('Bullpen fetch failed:',err); }
+  }
+}
+
+async function getBullpenFatigue(teamId, today, days){
+  try {
+    const endDate = new Date(today);
+    endDate.setDate(endDate.getDate()-1);
+    const startDate = new Date(endDate);
+    startDate.setDate(startDate.getDate()-(days-1));
+
+    const start = startDate.toISOString().slice(0,10);
+    const end = endDate.toISOString().slice(0,10);
+
+    const res = await fetch(`https://statsapi.mlb.com/api/v1/schedule?sportId=1&teamId=${teamId}&startDate=${start}&endDate=${end}&hydrate=linescore`);
+    const data = await res.json();
+    const recentGames = (data.dates||[]).flatMap(d=>d.games||[]);
+
+    let totalBullpenPitches = 0;
+    let gamesPlayed = recentGames.length;
+
+    for(const rg of recentGames){
+      // Estimate bullpen usage: if game went to extras or starter was pulled early, bullpen worked more
+      const innings = rg.linescore?.currentInning||9;
+      const extraInnings = Math.max(0, innings-9);
+      totalBullpenPitches += extraInnings * 15 + (gamesPlayed>0?30:0);
+    }
+
+    const fatigueScore = gamesPlayed===0 ? 0 : Math.min(10, (totalBullpenPitches/gamesPlayed));
+    return { fatigueScore, gamesInLast3: gamesPlayed };
+  } catch(e){ return null; }
+}
+
+// ─── Weather Data ─────────────────────────────────────────────────────────────
+async function fetchWeatherData(){
+  for(const g of games){
+    const stadium = STADIUMS[g.home_team];
+    const isIndoor = INDOOR.includes(g.home_team);
+    if(!enriched[g.id]) enriched[g.id]={};
+
+    if(isIndoor){
+      enriched[g.id].weather = {indoor:true, wind:0, temp:72, desc:'Indoor stadium'};
+      continue;
+    }
+    if(!stadium){ enriched[g.id].weather = null; continue; }
+
+    try {
+      const gameTime = new Date(g.commence_time);
+      const dateStr = gameTime.toISOString().slice(0,10);
+      const hour = gameTime.getUTCHours();
+
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${stadium.lat}&longitude=${stadium.lon}&hourly=temperature_2m,windspeed_10m,winddirection_10m,weathercode&temperature_unit=fahrenheit&windspeed_unit=mph&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      // Find the hour closest to game time
+      const hours = data.hourly?.time||[];
+      let bestIdx = 0;
+      let bestDiff = Infinity;
+      hours.forEach((t,i)=>{
+        const h = new Date(t).getHours();
+        const diff = Math.abs(h-hour);
+        if(diff<bestDiff){bestDiff=diff;bestIdx=i;}
+      });
+
+      const wind = data.hourly?.windspeed_10m?.[bestIdx]||0;
+      const windDir = data.hourly?.winddirection_10m?.[bestIdx]||0;
+      const temp = data.hourly?.temperature_2m?.[bestIdx]||70;
+      const wcode = data.hourly?.weathercode?.[bestIdx]||0;
+
+      const windDirStr = compassDir(windDir);
+      const desc = wcode>=61&&wcode<=67 ? 'Rain possible' : wcode>=71 ? 'Snow/ice' : 'Clear/clouds';
+
+      enriched[g.id].weather = {
+        indoor:false, wind, windDir, windDirStr, temp, desc,
+        stadiumName: stadium.name,
+        isHighWind: wind>=12,
+        isBlowingOut: wind>=10 && isBlowingOut(windDir, g.home_team),
+        isBlowingIn: wind>=10 && isBlowingIn(windDir, g.home_team),
+        isCold: temp<50,
+        rainRisk: wcode>=61&&wcode<=67
+      };
+    } catch(e){
+      enriched[g.id].weather = null;
+    }
+  }
+}
+
+function compassDir(deg){
+  const dirs=['N','NE','E','SE','S','SW','W','NW'];
+  return dirs[Math.round(deg/45)%8];
+}
+
+// Simplified: wind blowing out (toward outfield) at key parks
+function isBlowingOut(windDir, team){
+  // Wrigley: blowing out when wind from SW (180-270)
+  if(team==='Chicago Cubs') return windDir>=180&&windDir<=270;
+  // Fenway: out when from NW
+  if(team==='Boston Red Sox') return windDir>=270&&windDir<=360;
+  // Generic: any strong wind has some out effect
+  return windDir>=135&&windDir<=315;
+}
+function isBlowingIn(windDir, team){
+  if(team==='Chicago Cubs') return windDir>=0&&windDir<=90;
+  if(team==='Boston Red Sox') return windDir>=90&&windDir<=200;
+  return !(windDir>=135&&windDir<=315);
+}
+
+// ─── Composite Bet Score ──────────────────────────────────────────────────────
+function computeBetScore(game, side){
+  // side: 'home' or 'away' or 'over' or 'under'
+  const dk = game.bookmakers.find(b=>b.key==='draftkings');
+  if(!dk) return {score:0, rec:'NO DATA', factors:{}};
+  const h2h = dk.markets.find(m=>m.key==='h2h');
+  const tots = dk.markets.find(m=>m.key==='totals');
+  const home = game.home_team, away = game.away_team;
+  const homeOdds = h2h?.outcomes.find(o=>o.name===home)?.price??null;
+  const awayOdds = h2h?.outcomes.find(o=>o.name!==home)?.price??null;
+  const overOdds = tots?.outcomes.find(o=>o.name==='Over')?.price??null;
+  const underOdds = tots?.outcomes.find(o=>o.name==='Under')?.price??null;
+
+  const hI = homeOdds?impProb(homeOdds):0.5;
+  const aI = awayOdds?impProb(awayOdds):0.5;
+  const tI = hI+aI;
+  const hTrue = hI/tI, aTrue = aI/tI;
+
+  const e = enriched[game.id]||{};
+  const hStats = e.homePitcherStats, aStats = e.awayPitcherStats;
+  const hBull = e.homeBullpen, aBull = e.awayBullpen;
+  const weather = e.weather;
+
+  let factors = {};
+  let totalScore = 0;
+
+  // ── Factor 1: EV Signal (35% weight → max 1.75 pts) ──
+  // Model prob adjustment based on pitcher FIP vs league average (4.30)
+  let modelHomeProb = hTrue;
+  if(hStats?.fip && aStats?.fip){
+    const fipDiff = aStats.fip - hStats.fip; // positive = home pitcher better
+    const adjustment = Math.max(-0.08, Math.min(0.08, fipDiff*0.02));
+    modelHomeProb = Math.max(0.1, Math.min(0.9, hTrue + adjustment));
+  }
+  const targetOdds = side==='home'?homeOdds:side==='away'?awayOdds:side==='over'?overOdds:underOdds;
+  const targetProb = side==='home'?modelHomeProb:side==='away'?1-modelHomeProb:0.5;
+  const ev = targetOdds ? calcEV(targetProb*100, targetOdds) : -5;
+  const evScore = Math.max(0, Math.min(1.75, ev/5*1.75));
+  factors.ev = {score:evScore, val:ev.toFixed(1)+'%', label:'EV Signal', note: ev>3?'Positive edge':'Low/no edge'};
+  totalScore += evScore;
+
+  // ── Factor 2: Pitcher FIP Advantage (25% weight → max 1.25 pts) ──
+  let pitcherScore = 0.625; // neutral
+  let pitcherNote = 'No pitcher data';
+  if(hStats?.fip && aStats?.fip){
+    const isHome = side==='home';
+    const myFIP = isHome ? hStats.fip : aStats.fip;
+    const oppFIP = isHome ? aStats.fip : hStats.fip;
+    const gap = oppFIP - myFIP; // positive = my pitcher better
+    pitcherScore = Math.max(0, Math.min(1.25, 0.625 + gap*0.15));
+    pitcherNote = gap>0.5 ? `Your starter FIP ${myFIP.toFixed(2)} vs ${oppFIP.toFixed(2)} opp — significant edge` :
+                  gap<-0.5 ? `Opp starter FIP ${oppFIP.toFixed(2)} vs your ${myFIP.toFixed(2)} — disadvantage` :
+                  `FIPs close (${myFIP.toFixed(2)} vs ${oppFIP.toFixed(2)}) — neutral`;
+  } else if(hStats?.fip || aStats?.fip){
+    pitcherNote = 'Partial pitcher data';
+  }
+  factors.pitcher = {score:pitcherScore, val: hStats?.fip ? `${hStats.fip.toFixed(2)} / ${aStats?.fip?.toFixed(2)||'?'}` : '—', label:'Pitcher FIP', note:pitcherNote};
+  totalScore += pitcherScore;
+
+  // ── Factor 3: Bullpen Fatigue (15% weight → max 0.75 pts) ──
+  let bullScore = 0.375; // neutral
+  let bullNote = 'No bullpen data';
+  const myBull = side==='home' ? hBull : side==='away' ? aBull : null;
+  const oppBull = side==='home' ? aBull : side==='away' ? hBull : null;
+  if(myBull!==null && oppBull!==null && myBull && oppBull){
+    const oppFatigue = oppBull.fatigueScore||0;
+    const myFatigue = myBull.fatigueScore||0;
+    const netFatigue = oppFatigue - myFatigue;
+    bullScore = Math.max(0, Math.min(0.75, 0.375 + netFatigue*0.05));
+    bullNote = oppFatigue>5 ? `Opp bullpen fatigued (${oppBull.gamesInLast3} games in 3 days)` :
+               myFatigue>5 ? `Your bullpen fatigued — risk` : 'Both bullpens rested';
+  } else if(side==='over'||side==='under'){
+    // For totals: high bullpen fatigue on both sides → more runs → lean over
+    const avgFatigue = ((hBull?.fatigueScore||0)+(aBull?.fatigueScore||0))/2;
+    bullScore = side==='over' ? Math.min(0.75, 0.375+avgFatigue*0.03) : Math.max(0, 0.375-avgFatigue*0.03);
+    bullNote = avgFatigue>4 ? 'Both bullpens tired — runs likely' : 'Bullpens fresh';
+  }
+  factors.bullpen = {score:bullScore, val:myBull?`${(myBull.fatigueScore||0).toFixed(1)}`:'—', label:'Bullpen Fatigue', note:bullNote};
+  totalScore += bullScore;
+
+  // ── Factor 4: Line Movement (15% weight → max 0.75 pts) ──
+  // Proxy: if team is heavy favorite (odds < -150), assume sharp vetting
+  let moveScore = 0.375;
+  let moveNote = 'No movement data';
+  if(targetOdds){
+    // Simple proxy: very short prices suggest sharp consensus
+    if(targetOdds<-200){ moveScore=0.6; moveNote='Heavy favorite — sharp consensus likely';}
+    else if(targetOdds<-130){ moveScore=0.45; moveNote='Moderate favorite';}
+    else if(targetOdds>+130){ moveScore=0.3; moveNote='Underdog — higher variance';}
+    else { moveScore=0.375; moveNote='Near even money — uncertain';}
+  }
+  factors.lineMove = {score:moveScore, val:targetOdds?fmtOdds(targetOdds):'—', label:'Line / Price', note:moveNote};
+  totalScore += moveScore;
+
+  // ── Factor 5: Weather (10% weight → max 0.5 pts) ──
+  let weatherScore = 0.25; // neutral
+  let weatherNote = 'No weather data';
+  if(weather){
+    if(weather.indoor){ weatherScore=0.25; weatherNote='Indoor — weather irrelevant';}
+    else {
+      if(side==='over'){
+        if(weather.isBlowingOut){ weatherScore=0.5; weatherNote=`Wind ${weather.wind.toFixed(0)}mph OUT (${weather.windDirStr}) — boosts offense`;}
+        else if(weather.isBlowingIn){ weatherScore=0; weatherNote=`Wind ${weather.wind.toFixed(0)}mph IN (${weather.windDirStr}) — suppresses runs`;}
+        else if(weather.isCold){ weatherScore=0.1; weatherNote=`Cold (${weather.temp.toFixed(0)}°F) — suppresses offense`;}
+        else { weatherScore=0.25; weatherNote=`Wind ${weather.wind.toFixed(0)}mph — neutral`;}
+      } else if(side==='under'){
+        if(weather.isBlowingIn){ weatherScore=0.5; weatherNote=`Wind ${weather.wind.toFixed(0)}mph IN — suppresses runs, lean under`;}
+        else if(weather.isBlowingOut){ weatherScore=0; weatherNote=`Wind blowing out — bad for under`;}
+        else if(weather.isCold){ weatherScore=0.4; weatherNote=`Cold (${weather.temp.toFixed(0)}°F) — run suppressor`;}
+        else { weatherScore=0.25; weatherNote=`Wind ${weather.wind.toFixed(0)}mph — neutral`;}
+      } else {
+        // Moneyline — weather is minor factor
+        if(weather.rainRisk){ weatherScore=0.15; weatherNote='Rain risk — game may be delayed';}
+        else { weatherScore=0.25; weatherNote=`${weather.temp.toFixed(0)}°F, wind ${weather.wind.toFixed(0)}mph ${weather.windDirStr}`;}
+      }
+    }
+  }
+  factors.weather = {score:weatherScore, val:weather?`${weather.wind?.toFixed(0)||0}mph`:'—', label:'Weather', note:weatherNote};
+  totalScore += weatherScore;
+
+  // ── Final score: scale to 1–5 ──
+  const maxPossible = 1.75+1.25+0.75+0.75+0.5; // 5.0
+  const rawScore = Math.max(0, Math.min(5, totalScore/maxPossible*5));
+  const score = Math.max(1, Math.min(5, rawScore));
+
+  return {score, factors, ev, modelProb:targetProb, targetOdds};
+}
+
+function bestBetForGame(game){
+  const dk = game.bookmakers.find(b=>b.key==='draftkings');
+  if(!dk) return null;
+  const h2h = dk.markets.find(m=>m.key==='h2h');
+  const tots = dk.markets.find(m=>m.key==='totals');
+  const home = game.home_team;
+  const sides = [];
+  if(h2h){
+    sides.push({side:'home', label:`${home.split(' ').pop()} ML`, result:computeBetScore(game,'home')});
+    sides.push({side:'away', label:`${game.away_team.split(' ').pop()} ML`, result:computeBetScore(game,'away')});
+  }
+  if(tots){
+    sides.push({side:'over', label:'OVER', result:computeBetScore(game,'over')});
+    sides.push({side:'under', label:'UNDER', result:computeBetScore(game,'under')});
+  }
+  sides.sort((a,b)=>b.result.score-a.result.score);
+  return sides[0];
+}
+
+// ─── Render Games ─────────────────────────────────────────────────────────────
+function renderGames(){
+  if(!games.length) return;
+  const threshold = parseFloat(document.getElementById('score-threshold').value)||1;
+  let html='', strongCount=0;
+
+  games.forEach((g,i)=>{
+    const dk = g.bookmakers.find(b=>b.key==='draftkings');
+    if(!dk) return;
+    const h2h = dk.markets.find(m=>m.key==='h2h');
+    const tots = dk.markets.find(m=>m.key==='totals');
+    const home=g.home_team, away=g.away_team;
+    const homeOdds=h2h?.outcomes.find(o=>o.name===home)?.price??null;
+    const awayOdds=h2h?.outcomes.find(o=>o.name!==home)?.price??null;
+    const overOdds=tots?.outcomes.find(o=>o.name==='Over')?.price??null;
+    const total=tots?.outcomes.find(o=>o.name==='Over')?.point??null;
+
+    const hI=homeOdds?impProb(homeOdds):null, aI=awayOdds?impProb(awayOdds):null;
+    const tI=hI&&aI?hI+aI:null;
+    const hTrue=tI?hI/tI:null, aTrue=tI?aI/tI:null;
+    const vig=tI?(tI-1)*100:null;
+    const e=enriched[g.id]||{};
+
+    const best = bestBetForGame(g);
+    const score = best ? best.result.score : 0;
+    const scoreRnd = Math.round(score);
+    const sc = scoreColor(scoreRnd);
+
+    if(scoreRnd>=4) strongCount++;
+
+    const time=new Date(g.commence_time).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZoneName:'short'});
+
+    // Signal tags
+    const tags=[];
+    if(e.homeStarter) tags.push({l:`SP: ${e.homeStarter.name.split(' ').pop()}`,t:'info'});
+    if(e.weather&&!e.weather.indoor&&e.weather.wind>=12) tags.push({l:`WIND ${e.weather.wind.toFixed(0)}MPH ${e.weather.windDirStr}`,t:e.weather.isBlowingOut?'bull':e.weather.isBlowingIn?'bear':'neu'});
+    if(e.weather?.rainRisk) tags.push({l:'RAIN RISK',t:'bear'});
+    if(e.homeBullpen?.fatigueScore>5) tags.push({l:'HOME BULL TIRED',t:'bear'});
+    if(e.awayBullpen?.fatigueScore>5) tags.push({l:'AWAY BULL TIRED',t:'bull'});
+    if(e.homePitcherStats?.fip && e.awayPitcherStats?.fip){
+      const gap=e.awayPitcherStats.fip-e.homePitcherStats.fip;
+      if(gap>0.7) tags.push({l:'HOME SP EDGE',t:'bull'});
+      else if(gap<-0.7) tags.push({l:'AWAY SP EDGE',t:'bull'});
+    }
+    if(e.weather?.indoor) tags.push({l:'INDOOR',t:'neu'});
+
+    const bw = Math.min(100,(score/5)*100);
+
+    html+=`<div class="game-card${selectedIdx===i?' selected':''}" onclick="selectGame(${i})">
+      <div class="card-top">
+        <div class="matchup-col">
+          <div class="game-time">⏰ ${time}${e.weather&&!e.weather.indoor?` · ${e.weather.temp?.toFixed(0)||'?'}°F`:''}</div>
+          <div class="matchup-row">
+            <span class="team">${away.split(' ').pop().toUpperCase()}</span>
+            <span class="vs">@</span>
+            <span class="team">${home.split(' ').pop().toUpperCase()}</span>
+          </div>
+          ${e.homeStarter||e.awayStarter?`<div style="display:flex;gap:8px;margin-top:8px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted)">
+              ${e.awayStarter?`✈ ${e.awayStarter.name}${e.awayPitcherStats?.fip?' FIP:'+e.awayPitcherStats.fip.toFixed(2):''}`:' TBD'}
+            </div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted)">
+              🏠 ${e.homeStarter?`${e.homeStarter.name}${e.homePitcherStats?.fip?' FIP:'+e.homePitcherStats.fip.toFixed(2):''}`:' TBD'}
+            </div>
+          </div>`:''}
+        </div>
+        <div class="bet-score-wrap">
+          <div class="bet-score-num" style="color:${sc}">${scoreRnd}</div>
+          <div class="bet-score-label" style="color:${sc}">${scoreRnd>=4?'BET IT':scoreRnd===3?'MARGINAL':'PASS'}</div>
+          ${best?`<div class="bet-score-rec" style="background:${sc}20;color:${sc};border:1px solid ${sc}40">${best.label}</div>`:''}
+        </div>
+      </div>
+      <div class="odds-row">
+        ${awayOdds?`<div class="odds-cell"><div class="odds-label">Away ML</div><div class="odds-val" style="color:${awayOdds>0?'var(--pos)':'var(--text)'}">${fmtOdds(awayOdds)}</div><div class="odds-prob">${aTrue?fmtPct(aTrue):'—'} true</div></div>`:''}
+        ${total?`<div class="odds-cell"><div class="odds-label">Total</div><div class="odds-val" style="color:var(--accent2)">${total}</div><div class="odds-prob">O${overOdds?fmtOdds(overOdds):'?'}</div></div>`:''}
+        ${homeOdds?`<div class="odds-cell"><div class="odds-label">Home ML</div><div class="odds-val" style="color:${homeOdds>0?'var(--pos)':'var(--text)'}">${fmtOdds(homeOdds)}</div><div class="odds-prob">${hTrue?fmtPct(hTrue):'—'} true</div></div>`:''}
+      </div>
+      ${vig!==null?`<span class="vig-chip">VIG <span>${vig.toFixed(2)}%</span></span>`:''}
+      <div class="sig-row">${tags.map(t=>`<span class="sig-tag ${t.t}">${t.l}</span>`).join('')}</div>
+      <div class="score-bar-label-row"><span>BET SCORE</span><span style="color:${sc};font-weight:600">${score.toFixed(1)} / 5.0</span></div>
+      <div class="score-bar-track"><div class="score-bar-fill" style="width:${bw}%;background:${sc}"></div></div>
+    </div>`;
+  });
+
+  document.getElementById('games-list').innerHTML=html||'<div class="empty"><p>No DraftKings MLB odds found for today.</p></div>';
+  document.getElementById('s-strong').textContent=strongCount;
+}
+
+function selectGame(i){
+  selectedIdx = selectedIdx===i ? null : i;
+  renderGames();
+  if(selectedIdx!==null) renderDetail(selectedIdx);
+  else document.getElementById('game-detail').innerHTML='';
+}
+
+function renderDetail(i){
+  const g = games[i];
+  const dk = g.bookmakers.find(b=>b.key==='draftkings');
+  const h2h = dk?.markets.find(m=>m.key==='h2h');
+  const tots = dk?.markets.find(m=>m.key==='totals');
+  const home=g.home_team, away=g.away_team;
+  const homeOdds=h2h?.outcomes.find(o=>o.name===home)?.price??null;
+  const awayOdds=h2h?.outcomes.find(o=>o.name!==home)?.price??null;
+  const overOdds=tots?.outcomes.find(o=>o.name==='Over')?.price??null;
+  const underOdds=tots?.outcomes.find(o=>o.name==='Under')?.price??null;
+  const total=tots?.outcomes.find(o=>o.name==='Over')?.point??null;
+
+  const hI=homeOdds?impProb(homeOdds):null, aI=awayOdds?impProb(awayOdds):null;
+  const tI=hI&&aI?hI+aI:null;
+  const hTrue=tI?hI/tI:null, aTrue=tI?aI/tI:null;
+  const vig=tI?(tI-1)*100:null;
+  const e=enriched[g.id]||{};
+  const br=parseFloat(document.getElementById('bankroll').value)||1000;
+  const weather=e.weather;
+
+  // Compute all 4 bets
+  const bets4 = [
+    {side:'home', label:`${home.split(' ').pop()} ML`, odds:homeOdds},
+    {side:'away', label:`${away.split(' ').pop()} ML`, odds:awayOdds},
+    {side:'over',  label:`OVER ${total||''}`,  odds:overOdds},
+    {side:'under', label:`UNDER ${total||''}`, odds:underOdds},
+  ].map(b=>({...b, result:computeBetScore(g,b.side)}));
+  bets4.sort((a,b)=>b.result.score-a.result.score);
+  const top=bets4[0];
+  const sc=scoreColor(Math.round(top.result.score));
+
+  let recBg='rgba(255,68,85,0.08)', recBorder='rgba(255,68,85,0.25)';
+  if(top.result.score>=4){recBg='rgba(0,255,136,0.08)';recBorder='rgba(0,255,136,0.25)';}
+  else if(top.result.score>=3){recBg='rgba(255,204,0,0.08)';recBorder='rgba(255,204,0,0.25)';}
+
+  const kelly=top.odds?kellyF(top.result.modelProb*100,top.odds):0;
+  const halfBet=kelly*.5*br;
+  const ev=top.result.ev;
+
+  document.getElementById('game-detail').innerHTML=`
+  <div class="panel">
+    <h3>${away.split(' ').pop().toUpperCase()} @ ${home.split(' ').pop().toUpperCase()} — FULL ANALYSIS</h3>
+
+    <!-- Top Recommendation -->
+    <div class="rec-box" style="background:${recBg};border:1px solid ${recBorder}">
+      <div class="rec-score-big" style="color:${sc}">${Math.round(top.result.score)}</div>
+      <div class="rec-details">
+        <div class="rec-bet-type" style="color:${sc}">RECOMMENDED: ${top.label}</div>
+        <div class="rec-reason">
+          ${top.odds?`Odds: ${fmtOdds(top.odds)} · Model prob: ${(top.result.modelProb*100).toFixed(1)}% · EV: ${ev.toFixed(1)}% · ½ Kelly: $${halfBet.toFixed(0)}`:'No odds available'}
+        </div>
+        <div class="rec-reason" style="margin-top:4px">
+          ${top.result.score>=4?'✅ Strong signal across multiple factors — worth a bet at ½ Kelly sizing.':top.result.score>=3?'⚠️ Marginal signal — consider a small stake or wait for more information.':'❌ Weak signal — pass on this game.'}
+        </div>
+      </div>
+    </div>
+
+    <!-- All 4 bets scored -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px">
+      ${bets4.map(b=>{
+        const sc2=scoreColor(Math.round(b.result.score));
+        const ev2=b.result.ev;
+        return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:10px;text-align:center">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px">${b.label}</div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:${sc2}">${Math.round(b.result.score)}</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:${sc2}">${b.odds?fmtOdds(b.odds):'—'}</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);margin-top:2px">EV: ${ev2.toFixed(1)}%</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- Factor breakdown for top pick -->
+    <div style="margin-top:16px">
+      <div class="sec-title" style="margin-bottom:10px">SCORE BREAKDOWN — ${top.label}</div>
+      <div class="score-breakdown">
+        ${Object.values(top.result.factors).map(f=>{
+          const pct=Math.min(100,(f.score/1.75)*100);
+          const fc=f.score>f.score*0.6?'var(--pos)':'var(--neg)';
+          return `<div class="score-factor">
+            <div class="score-factor-name">${f.label}</div>
+            <div class="score-factor-val" style="color:${scoreColor(Math.round(f.score/.35))}">${f.val}</div>
+            <div class="score-factor-note">${f.note}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- Pitcher detail -->
+    ${(e.homeStarter||e.awayStarter)?`
+    <div style="margin-top:16px">
+      <div class="sec-title" style="margin-bottom:8px">STARTING PITCHERS</div>
+      <div class="pitcher-row">
+        <div class="pitcher-card">
+          <div style="font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:1px;margin-bottom:4px">AWAY STARTER</div>
+          <div class="pitcher-name">${e.awayStarter?.name||'TBD'}</div>
+          ${e.awayPitcherStats?`
+          <div style="display:flex;gap:10px;margin-top:4px">
+            <div><div class="pitcher-stat">FIP</div><div class="pitcher-fip" style="color:${e.awayPitcherStats.fip<3.5?'var(--pos)':e.awayPitcherStats.fip<4.5?'var(--neu)':'var(--neg)'}">${e.awayPitcherStats.fip?.toFixed(2)||'—'}</div></div>
+            <div><div class="pitcher-stat">ERA</div><div class="pitcher-fip" style="color:var(--muted)">${e.awayPitcherStats.era?.toFixed(2)||'—'}</div></div>
+            <div><div class="pitcher-stat">WHIP</div><div class="pitcher-fip" style="color:var(--muted)">${e.awayPitcherStats.whip?.toFixed(2)||'—'}</div></div>
+            <div><div class="pitcher-stat">K/9</div><div class="pitcher-fip" style="color:var(--muted)">${e.awayPitcherStats.k9?.toFixed(1)||'—'}</div></div>
+          </div>`:
+          '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:10px;color:var(--muted);margin-top:4px">Stats loading...</div>'}
+        </div>
+        <div class="pitcher-card">
+          <div style="font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:1px;margin-bottom:4px">HOME STARTER</div>
+          <div class="pitcher-name">${e.homeStarter?.name||'TBD'}</div>
+          ${e.homePitcherStats?`
+          <div style="display:flex;gap:10px;margin-top:4px">
+            <div><div class="pitcher-stat">FIP</div><div class="pitcher-fip" style="color:${e.homePitcherStats.fip<3.5?'var(--pos)':e.homePitcherStats.fip<4.5?'var(--neu)':'var(--neg)'}">${e.homePitcherStats.fip?.toFixed(2)||'—'}</div></div>
+            <div><div class="pitcher-stat">ERA</div><div class="pitcher-fip" style="color:var(--muted)">${e.homePitcherStats.era?.toFixed(2)||'—'}</div></div>
+            <div><div class="pitcher-stat">WHIP</div><div class="pitcher-fip" style="color:var(--muted)">${e.homePitcherStats.whip?.toFixed(2)||'—'}</div></div>
+            <div><div class="pitcher-stat">K/9</div><div class="pitcher-fip" style="color:var(--muted)">${e.homePitcherStats.k9?.toFixed(1)||'—'}</div></div>
+          </div>`:
+          '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:10px;color:var(--muted);margin-top:4px">Stats loading...</div>'}
+        </div>
+      </div>
+    </div>`:''}
+
+    <!-- Weather detail -->
+    ${weather?`
+    <div style="margin-top:14px">
+      <div class="sec-title" style="margin-bottom:8px">WEATHER — ${weather.stadiumName||'Stadium'}</div>
+      <div class="alert ${weather.indoor?'info':weather.isHighWind?'neu':'info'}">
+        ${weather.indoor?'🏟️ Indoor stadium — weather has no effect on this game.' :
+          `🌡️ ${weather.temp?.toFixed(0)||'?'}°F  💨 Wind: ${weather.wind?.toFixed(0)||'0'}mph ${weather.windDirStr||''}
+          ${weather.isBlowingOut?' — Blowing OUT. Expect more offense, lean Over.':''}
+          ${weather.isBlowingIn?' — Blowing IN. Expect fewer runs, lean Under.':''}
+          ${weather.isCold&&!weather.isBlowingOut?' — Cold temps suppress offense.':''}
+          ${weather.rainRisk?' ⛈️ Rain risk — watch for delays.':''}`}
+      </div>
+    </div>`:''}
+
+    <!-- Quick log -->
+    <div class="quick-btns">
+      ${homeOdds?`<button class="quick-btn" style="background:var(--pos);color:#000" onclick="quickLog('${home.split(' ').pop()} ML','${away} @ ${home}',${homeOdds})">LOG ${home.split(' ').pop().toUpperCase()} ML</button>`:''}
+      ${awayOdds?`<button class="quick-btn" style="background:var(--accent2);color:#fff" onclick="quickLog('${away.split(' ').pop()} ML','${away} @ ${home}',${awayOdds})">LOG ${away.split(' ').pop().toUpperCase()} ML</button>`:''}
+      ${overOdds?`<button class="quick-btn" style="background:#555;color:#fff" onclick="quickLog('Over ${total}','${away} @ ${home}',${overOdds})">LOG OVER ${total}</button>`:''}
+      ${underOdds?`<button class="quick-btn" style="background:#333;color:#fff" onclick="quickLog('Under ${total}','${away} @ ${home}',${underOdds})">LOG UNDER ${total}</button>`:''}
+    </div>
+  </div>`;
+
+  document.getElementById('game-detail').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
+function fuzzyMatch(a,b){
+  a=a.toLowerCase(); b=b.toLowerCase();
+  if(a===b) return true;
+  const aWords=a.split(' '), bWords=b.split(' ');
+  // Match if last word (team nickname) matches
+  return aWords[aWords.length-1]===bWords[bWords.length-1];
+}
+
+function setBadge(id,cls,txt){
+  const el=document.getElementById(id);
+  el.className='badge'+(cls?' '+cls:'');
+  el.textContent=txt;
+}
+function showStatus(type,msg){
+  const el=document.getElementById('api-status');
+  el.className='alert '+(type==='ok'?'ok':type==='info'?'info':'err');
+  el.textContent=msg;
+  setTimeout(()=>{el.className='';el.textContent='';},7000);
+}
+function quickLog(pick,matchup,odds){
+  switchTab('tracker',document.querySelectorAll('.tab')[2]);
+  document.getElementById('t-pick').value=pick;
+  document.getElementById('t-matchup').value=matchup;
+  document.getElementById('t-odds').value=odds;
+  document.getElementById('t-stake').focus();
+}
+
+// ─── EV Calculator ────────────────────────────────────────────────────────────
+function calcEVManual(){
+  const odds=parseFloat(document.getElementById('c-odds').value);
+  const prob=parseFloat(document.getElementById('c-prob').value);
+  const br=parseFloat(document.getElementById('c-br').value)||1000;
+  if(!odds||!prob) return;
+  const imp=impProb(odds)*100, ev=calcEV(prob,odds), kelly=kellyF(prob,odds), half=kelly*.5*br;
+  const ec=evCol(ev);
+  document.getElementById('c-imp').textContent=imp.toFixed(1)+'%';
+  document.getElementById('c-ev').textContent=(ev>0?'+':'')+ev.toFixed(2);
+  document.getElementById('c-ev').style.color=ec;
+  document.getElementById('c-kelly').textContent=(kelly*100).toFixed(1)+'%';
+  document.getElementById('c-kelly').style.color=kelly>0?'var(--pos)':'var(--neg)';
+  document.getElementById('c-half').textContent='$'+half.toFixed(0);
+  document.getElementById('c-half').style.color=half>0?'var(--accent2)':'var(--muted)';
+  document.getElementById('c-verdict').innerHTML=`<div class="alert ${ev>0?'ok':'err'}">${ev>0?`+EV bet. Edge: ${(prob-imp).toFixed(1)}pp over implied. ½ Kelly: $${half.toFixed(0)} on $${br} bankroll.`:`Negative EV. Book has ${(imp-prob).toFixed(1)}pp edge. Pass.`}</div>`;
+}
+function calcVig(){
+  const a=parseFloat(document.getElementById('v-a').value);
+  const b=parseFloat(document.getElementById('v-b').value);
+  if(!a||!b) return;
+  const rA=impProb(a),rB=impProb(b),tot=rA+rB;
+  const tA=rA/tot,tB=rB/tot,vig=(tot-1)*100,margin=((tot-1)/tot)*100;
+  document.getElementById('v-rawa').textContent=(rA*100).toFixed(1)+'%';
+  document.getElementById('v-rawb').textContent=(rB*100).toFixed(1)+'%';
+  document.getElementById('v-truea').textContent=(tA*100).toFixed(1)+'%';
+  document.getElementById('v-trueb').textContent=(tB*100).toFixed(1)+'%';
+  document.getElementById('v-vig').textContent=vig.toFixed(2)+'%';
+  document.getElementById('v-margin').textContent=margin.toFixed(2)+'%';
+}
+
+// ─── Bet Tracker ──────────────────────────────────────────────────────────────
+function addBet(){
+  const matchup=document.getElementById('t-matchup').value.trim();
+  const pick=document.getElementById('t-pick').value.trim();
+  const odds=parseFloat(document.getElementById('t-odds').value);
+  const stake=parseFloat(document.getElementById('t-stake').value);
+  const prob=parseFloat(document.getElementById('t-prob').value);
+  const result=document.getElementById('t-result').value;
+  if(!matchup||!pick||!odds||!stake){alert('Fill in Matchup, Pick, Odds, and Stake.');return;}
+  const ev=prob?calcEV(prob,odds):null;
+  const dec=toDecimal(odds);
+  const pnl=result==='W'?stake*(dec-1):result==='L'?-stake:0;
+  bets.unshift({matchup,pick,odds,stake,prob,ev,result,pnl,id:Date.now(),date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})});
+  saveBets();
+  document.getElementById('t-matchup').value='';
+  document.getElementById('t-pick').value='';
+  document.getElementById('t-odds').value='';
+  document.getElementById('t-stake').value='';
+  document.getElementById('t-prob').value='';
+  renderTracker();
+}
+function updateResult(id,result){
+  bets=bets.map(b=>{
+    if(b.id!==id) return b;
+    const dec=toDecimal(b.odds);
+    const pnl=result==='W'?b.stake*(dec-1):result==='L'?-b.stake:0;
+    return {...b,result,pnl};
+  });
+  saveBets(); renderTracker();
+}
+function removeBet(id){bets=bets.filter(b=>b.id!==id);saveBets();renderTracker();}
+function saveBets(){localStorage.setItem('mlbedge_v2_bets',JSON.stringify(bets));}
+function renderTracker(){
+  document.getElementById('s-bets').textContent=bets.length;
+  const settled=bets.filter(b=>b.result!=='P');
+  const totalStake=settled.reduce((s,b)=>s+b.stake,0);
+  const totalPnl=settled.reduce((s,b)=>s+b.pnl,0);
+  const roi=totalStake>0?(totalPnl/totalStake*100):0;
+  const wins=settled.filter(b=>b.result==='W').length;
+  document.getElementById('s-roi').textContent=bets.length?((roi>=0?'+':'')+roi.toFixed(1)+'%'):'—';
+  document.getElementById('s-roi').style.color=roi>=0?'var(--pos)':'var(--neg)';
+  const sumEl=document.getElementById('tracker-summary');
+  if(bets.length){
+    sumEl.className='summary-grid';
+    sumEl.innerHTML=[
+      ['Total',bets.length,'var(--text)'],['Settled',settled.length,'var(--text)'],
+      ['Wins',wins,'var(--pos)'],
+      ['P&L',(totalPnl>=0?'+':'')+'$'+Math.abs(totalPnl).toFixed(0),totalPnl>=0?'var(--pos)':'var(--neg)'],
+      ['ROI',(roi>=0?'+':'')+roi.toFixed(1)+'%',roi>=0?'var(--pos)':'var(--neg)'],
+    ].map(([l,v,c])=>`<div class="stat-box"><div class="stat-val" style="color:${c}">${v}</div><div class="stat-lbl">${l}</div></div>`).join('');
+  } else {sumEl.className='';sumEl.innerHTML='';}
+  const tbody=document.getElementById('bet-tbody');
+  if(!bets.length){
+    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:40px;font-family:\'IBM Plex Mono\',monospace;font-size:11px">No bets logged yet.</td></tr>';
+    return;
+  }
+  tbody.innerHTML=bets.map(b=>{
+    const ec=b.ev!==null?evCol(b.ev):'var(--muted)';
+    const pc=b.result==='P'?'var(--muted)':b.pnl>=0?'var(--pos)':'var(--neg)';
+    return `<tr>
+      <td style="color:var(--muted)">${b.date}</td>
+      <td>${b.matchup}</td>
+      <td style="font-weight:600">${b.pick}</td>
+      <td style="color:${b.odds>0?'var(--pos)':'var(--text)'}">${fmtOdds(b.odds)}</td>
+      <td>$${b.stake}</td>
+      <td style="color:${ec}">${b.ev!==null?(b.ev>0?'+':'')+b.ev.toFixed(1)+'%':'—'}</td>
+      <td style="color:${pc}">${b.result==='P'?'—':(b.pnl>=0?'+':'')+('$'+Math.abs(b.pnl).toFixed(0))}</td>
+      <td><select onchange="updateResult(${b.id},this.value)" style="background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:10px;padding:3px 6px;border-radius:2px">
+        <option value="P"${b.result==='P'?' selected':''}>PENDING</option>
+        <option value="W"${b.result==='W'?' selected':''}>WIN</option>
+        <option value="L"${b.result==='L'?' selected':''}>LOSS</option>
+      </select></td>
+      <td><button class="rm-btn" onclick="removeBet(${b.id})">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+calcEVManual(); calcVig(); renderTracker(); renderPaperTab(); renderCalibration(); updateStaleBadge();
+</script>
+</body>
+</html>
